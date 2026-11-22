@@ -1,5 +1,15 @@
 # MyRA
 
-Tracker for NY Public Service Commission sessions, dockets and new proceedings.
+A personal tracker for New York Public Service Commission activity: session agendas and transcripts, filings in tracked dockets, and new proceedings.
 
-See `docs/` for design notes.
+## How it fits together
+
+- **collector/**: Google Apps Script. `bootstrap.gs` is pasted once into a Google Sheet's script editor. It loads `myra_code.js` from a Drive folder and runs every 5 minutes, exiting within seconds when idle. Once each morning it reads the PSC's Document and Matter Management system (DMM) and the DPS website, keeps a database in Drive, and writes the Sheet, a dashboard data file and an event queue. No AI runs here.
+- **docs/**: notes on the DMM data requests the collector uses.
+- **test/**: a Node harness that mocks the Apps Script services and runs the collector against live DMM and DPS data. Run `node test/run.js`.
+
+Still to come: the scheduled Claude check (summaries, narratives, digest) and the dashboard.
+
+## Configuration
+
+Drive file and folder IDs are placeholders (`YOUR_…`) in this copy.
