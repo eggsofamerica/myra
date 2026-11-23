@@ -5,7 +5,7 @@
 globalThis.MyRA = (function () {
   'use strict';
   var CFG = {
-    VERSION: '2026-11-23.2',
+    VERSION: '2026-11-23.3',
     ROOT: 'YOUR_MYRA_FOLDER_ID',
     INBOX: 'YOUR_INBOX_FOLDER_ID',
     WORK: 'YOUR_WORK_FOLDER_ID',
@@ -569,7 +569,7 @@ globalThis.MyRA = (function () {
         return { c: k.c, title: k.title, ind: k.ind, co: k.co, tr: !!k.tr, added: k.added, via: k.via, url: caseUrl(k.c), nfilings: fl.length,
           comments: { week: k.cWeek || 0, total: k.cTotal || 0 }, narrative: db.narratives[k.c] || null,
           filings: k.tr ? fl.filter(function (f) { return !f.bf || f.sum || f.st !== 'listed'; }).slice(0, 40).map(compactFiling) : [],
-          history: k.tr ? fl.filter(function (f) { return f.bf && !f.sum && f.st === 'listed'; }).slice(0, 60).map(function (f) { return { fs: f.fs, d: f.d, filer: f.filer, type: f.type, t: f.t, cls: f.cls, n: f.docs.length }; }) : [],
+          history: k.tr ? fl.filter(function (f) { return f.bf && !f.sum && f.st === 'listed'; }).slice(0, 60).map(function (f) { return { fs: f.fs, c: f.c, d: f.d, filer: f.filer, type: f.type, t: f.t, cls: f.cls, ent: f.ent || '', n: f.docs.length, docs: f.docs.map(function (x) { return { t: x.t, sz: x.sz, url: docUrl(x.r) }; }) }; }) : [],
           deadlines: db.deadlines.filter(function (d) { return d.c === k.c && d.date >= n.day; }) };
       }),
       sessions: sessions.map(function (s) {
@@ -674,6 +674,7 @@ globalThis.MyRA = (function () {
     var n = nyNow(), db = loadDb(), did = [];
     try {
       if (!db.seeded) { firstRun(db, n); did.push('setup'); db.lastSlot = slotFor(n) || db.lastSlot; }
+      else if (PropertiesService.getScriptProperties().getProperty('CODE_VERSION') !== CFG.VERSION) did.push('update to ' + CFG.VERSION);
       if (ingest(db)) did.push('inbox');
       var slot = slotFor(n);
       var weekday = n.dow <= 5 || n.dow === 7;      // Saturday off; Sunday runs the weekly reconcile

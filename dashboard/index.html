@@ -349,9 +349,12 @@ details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; p
     if (f.cls === 'priority') return '<span class="pill prio">' + esc(f.ent || 'Priority') + '</span>';
     return '';
   }
+  // Every listed filing links to its main document on DMM (or, failing that, to the docket's DMM page).
   function filingLink(f) {
-    var u = f.docs && f.docs[0] && f.docs[0].url;
-    return u ? '<a href="' + href(u) + '">' + esc(f.t || f.type) + '</a>' : esc(f.t || f.type);
+    var docs = f.docs || [], main = docs.filter(function (d) { return d.t === f.t; })[0] || docs[0];
+    var u = main && main.url ? main.url : (f.c ? DMM + f.c : '');
+    var label = esc(f.t || f.type || ('Filing ' + f.fs));
+    return u ? '<a href="' + href(u) + '">' + label + '</a>' : label;
   }
   function filingRow(f, opts) {
     opts = opts || {};
@@ -446,7 +449,7 @@ details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; p
     h += '<div class="meta">Key filings to read first. Untick any you don\'t need, then ask for summaries.</div><ul class="checks">';
     it.key.forEach(function (f) {
       var id = s.date + '|' + it.no + '|' + f.fs, chosen = state.sel[id] !== false;
-      h += '<li><label><input type="checkbox" data-key="' + esc(id) + '"' + (chosen ? ' checked' : '') + (f.sum || approved.indexOf(f.fs) >= 0 ? ' disabled' : '') + '> <span>' + (f.t ? filingLink(f) : esc(f.fs)) + ' <span class="meta">' + fmtDate(f.d) + ' · ' + esc(f.filer || '') + '</span>' + (f.sum ? ' <span class="pill good">Summarized</span>' : (approved.indexOf(f.fs) >= 0 ? ' <span class="pill warn">Requested</span>' : '')) + '</span></label>' +
+      h += '<li><label><input type="checkbox" data-key="' + esc(id) + '"' + (chosen ? ' checked' : '') + (f.sum || approved.indexOf(f.fs) >= 0 ? ' disabled' : '') + '> <span>' + filingLink(f) + ' <span class="meta">' + fmtDate(f.d) + ' · ' + esc(f.filer || '') + '</span>' + (f.sum ? ' <span class="pill good">Summarized</span>' : (approved.indexOf(f.fs) >= 0 ? ' <span class="pill warn">Requested</span>' : '')) + '</span></label>' +
         (f.sum ? '<details><summary>Summary</summary><div class="summary">' + md(f.sum) + '</div></details>' : '') + '</li>';
     });
     h += '</ul>';
@@ -475,7 +478,8 @@ details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; p
       if (k.deadlines && k.deadlines.length) h += deadlineRows(k.deadlines);
       if (fl.length) h += '<details class="fold"' + (state.ui['open:' + k.c] ? ' open' : '') + ' data-fold="' + esc(k.c) + '"><summary>New and summarized filings (' + fl.length + ')</summary><ul class="flist" style="margin-top:8px">' + fl.map(function (f) { return filingRow(f); }).join('') + '</ul></details>';
       if (hist.length) h += '<details class="fold"><summary>Earlier filings (' + hist.length + ' most recent)</summary><ul class="flist" style="margin-top:8px">' + hist.map(function (f) {
-        return '<li><div class="ftitle">' + esc(f.t || f.type) + '</div><div class="fmeta"><span>' + fmtDate(f.d) + '</span><span>·</span><span>' + esc(f.filer) + '</span>' + clsPill(f) + (pending('sum:' + f.fs) ? '<span class="pending">Summary requested</span>' : '<button class="btn ghost small" data-sum="' + esc(f.fs) + '">Summarize</button>') + '</div></li>';
+        if (!f.c) f.c = k.c;
+        return '<li><div class="ftitle">' + filingLink(f) + '</div><div class="fmeta"><span>' + fmtDate(f.d) + '</span><span>·</span><span>' + esc(f.filer) + '</span>' + clsPill(f) + (pending('sum:' + f.fs) ? '<span class="pending">Summary requested</span>' : '<button class="btn ghost small" data-sum="' + esc(f.fs) + '">Summarize</button>') + '</div></li>';
       }).join('') + '</ul></details>';
       h += '<div class="row">' + (rn ? '<span class="pending">Rebuilding the narrative with the next check</span>' : '<button class="btn ghost small" data-renarr="' + esc(k.c) + '">Rebuild narrative</button>') + '</div></div>';
     });
