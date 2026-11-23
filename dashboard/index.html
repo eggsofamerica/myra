@@ -114,6 +114,8 @@ details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; p
 .msg { font-size: 13px; color: var(--muted); }
 .msg.bad { color: var(--bad); }
 .pending { font-size: 12px; color: var(--warn); font-weight: 600; }
+#runbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-color: var(--accent); background: var(--accent-soft); }
+#runbar[hidden] { display: none; }
 .ent { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--line); }
 .ent:first-child { border-top: 0; }
 .ent b { font-weight: 600; }
@@ -125,8 +127,9 @@ details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; p
 <div class="wrap">
   <header>
     <div class="brand"><h1>MyRA</h1><span class="session">NY PSC · sessions &amp; dockets</span></div>
-    <div class="status" id="status"><span class="dot warn"></span><span>Loading from your Google Drive…</span></div>
+    <div class="row"><div class="status" id="status" style="flex:1 1 260px"><span class="dot warn"></span><span>Loading from your Google Drive…</span></div><button class="btn" id="run" hidden>Run the check now</button></div>
   </header>
+  <div id="runbar" class="banner" hidden></div>
   <div id="banner" class="banner" hidden></div>
   <div class="strip">
     <div class="tile"><b id="t-dockets">–</b><span>Tracked dockets</span></div>
@@ -335,12 +338,28 @@ details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; p
         banner((code === 'server_unavailable' || code === 'upstream_error') ? 'Not sure that reached Google Drive. Wait a few minutes and check before trying again.' : errorText(e), 'bad');
       });
   }
-  function runCheck(btn) {
-    if (!state.mcp) return;
-    btn.disabled = true; btn.textContent = 'Starting…';
-    state.mcp.callTool(RUNNER, 'fire_trigger', { trigger_id: CHECK_TASK }, { cache: false })
-      .then(function () { state.runAt = Date.now(); save_('myra-runAt', state.runAt); render(); })
-      .catch(function (e) { btn.disabled = false; btn.textContent = 'Run the check now'; banner('Couldn\'t start the check: ' + errorText(e), 'bad'); });
+  // Starts the scheduled check right away. The check itself waits for requests still in the inbox
+  // (the collector picks them up within 5 minutes), so it is safe to press right after asking for a summary.
+  function runCheck() {
+    if (!state.mcp || state.starting) return;
+    state.starting = true; paintRun();
+    state.mcp.callTool(RUNNER, 'fire_trigger', { trigger_id: CHECK_TASK, text: 'Started from the MyRA dashboard.' }, { cache: false })
+      .then(function () { state.starting = false; state.runAt = Date.now(); save_('myra-runAt', state.runAt); render(); })
+      .catch(function (e) { state.starting = false; paintRun(); banner('Couldn\'t start the check: ' + errorText(e), 'bad'); });
+  }
+  var NEEDS_CHECK = /^(sum|parts|approve|renarr|add|track|pick):/;
+  function waiting() { return Object.keys(state.pend).filter(function (k) { return NEEDS_CHECK.test(k) && state.pend[k] > state.runAt; }).length; }
+  function paintRun() {
+    var b = $('run'), bar = $('runbar');
+    if (!state.data || !state.mcp) { b.hidden = true; bar.hidden = true; return; }
+    var running = Date.now() - state.runAt < 20 * 60000, n = waiting();
+    b.hidden = false;
+    b.disabled = !!state.starting || running;
+    b.textContent = state.starting ? 'Starting…' : running ? 'Check running' : 'Run the check now';
+    b.className = 'btn' + (n ? '' : ' ghost');
+    if (running) { bar.hidden = false; bar.innerHTML = '<span>Check started ' + esc(new Date(state.runAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })) + '. It waits for your latest requests to reach MyRA, then works through them. Summaries usually land here within 10 to 20 minutes, with a push alert.</span>'; }
+    else if (n) { bar.hidden = false; bar.innerHTML = '<span style="flex:1 1 240px">' + n + ' request' + (n > 1 ? 's' : '') + ' waiting for the next check (weekdays 6:49 a.m.).</span><button class="btn small" id="runnow">Run it now</button>'; $('runnow').onclick = runCheck; }
+    else bar.hidden = true;
   }
 
   // ---------- pieces
@@ -401,8 +420,6 @@ details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; p
     h += '</div>';
     var act = (d.activity || []).slice(0, 12);
     if (act.length) h += '<div class="card"><h2>Recent activity</h2><ul class="flist">' + act.map(function (a) { return '<li class="meta">' + esc(new Date(a.ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) + ' · ' + (a.c ? '<span class="num">' + esc(a.c) + '</span> ' : '') + esc(a.text) + '</li>'; }).join('') + '</ul></div>';
-    var recent = Date.now() - state.runAt < 15 * 60000;
-    h += '<div class="card"><div class="row"><div class="meta" style="flex:1 1 260px">The check runs each weekday at 6:49 a.m. Run it now to get summaries you requested without waiting for tomorrow.</div><button class="btn ghost" id="run"' + (recent ? ' disabled' : '') + '>' + (recent ? 'Check started' : 'Run the check now') + '</button></div></div>';
     return h;
   }
   function viewSession() {
@@ -511,13 +528,14 @@ details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; p
     h += '</div><form id="entform" style="display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px"><label class="meta" for="entname">Add an entity</label><div class="add"><input id="entname" type="text" placeholder="Name, e.g. NRDC" aria-label="Entity name"></div>' +
       '<label class="meta" for="entmatch">Names as they appear in DMM, separated by commas (optional; defaults to the name above)</label><div class="add"><input id="entmatch" type="text" placeholder="National Resources Defense Council, Natural Resources Defense Council" aria-label="Names as they appear in DMM"><button class="btn" type="submit">Add</button></div></form></div>';
     h += '<div class="card"><h2>Where things live</h2><div class="row"><a href="' + href(SHEET_URL) + '">MyRA Sheet</a><a href="' + href(FOLDER_URL) + '">Drive folder</a><a href="' + href(DIGESTS_URL) + '">Digests</a></div>' +
-      '<div class="meta">The collector checks DMM and the DPS website each weekday around 6 a.m. The check writes summaries and the digest at 6:49 a.m. Requests you make here reach the collector within 5 minutes; summaries come with the next check, or sooner with "Run the check now" on the Today tab.</div></div>';
+      '<div class="meta">The collector checks DMM and the DPS website each weekday around 6 a.m. The check writes summaries and the digest at 6:49 a.m. Requests you make here reach the collector within 5 minutes; summaries come with the next check, or within about 10 to 20 minutes if you press "Run the check now" at the top.</div></div>';
     return h;
   }
 
   function render() {
     var d = state.data;
     ['today', 'session', 'dockets', 'cases', 'prefs'].forEach(function (t) { var b = $('tab-' + t); b.setAttribute('aria-selected', String(state.tab === t)); });
+    paintRun();
     if (!d) { $('view').innerHTML = '<div class="empty">' + (state.mcp === null ? '' : 'Loading…') + '</div>'; return; }
     var tr = dockets().filter(function (k) { return k.tr; });
     $('t-dockets').textContent = tr.length;
@@ -578,7 +596,6 @@ details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; p
     };
     var mine = $('mine'); if (mine) mine.onclick = function () { state.mineOnly = !state.mineOnly; render(); };
     var rt = $('routine'); if (rt) rt.onclick = function () { state.showRoutine = !state.showRoutine; render(); };
-    var run = $('run'); if (run) run.onclick = function () { runCheck(run); };
   }
   $('tabs').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-tab]'); if (!b) return;
@@ -587,6 +604,7 @@ details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; p
     render();
   });
   window.addEventListener('hashchange', function () { var t = location.hash.slice(1); if (/^(today|session|dockets|cases|prefs)$/.test(t)) { state.tab = t; render(); } });
+  $('run').onclick = runCheck;
   render();
   if (window.claude && window.claude.use) load(); else setStatus('bad', 'Open MyRA on claude.ai to load your data.');
 })();
