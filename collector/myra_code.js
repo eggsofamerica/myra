@@ -5,7 +5,7 @@
 globalThis.MyRA = (function () {
   'use strict';
   var CFG = {
-    VERSION: '2026-11-22.1',
+    VERSION: '2026-11-23.1',
     ROOT: 'YOUR_MYRA_FOLDER_ID',
     INBOX: 'YOUR_INBOX_FOLDER_ID',
     WORK: 'YOUR_WORK_FOLDER_ID',
@@ -111,7 +111,7 @@ globalThis.MyRA = (function () {
     var db = {};
     try { db = JSON.parse(dbFile().getBlob().getDataAsString() || '{}'); } catch (e) { db = {}; }
     ['dockets', 'filings', 'sessions', 'pubSeen', 'seenCases', 'seenComments', 'narratives'].forEach(function (k) { db[k] = db[k] || {}; });
-    ['events', 'errors', 'activity', 'newCases', 'deadlines', 'addFailed'].forEach(function (k) { db[k] = db[k] || []; });
+    ['events', 'errors', 'activity', 'newCases', 'deadlines', 'addFailed', 'digests'].forEach(function (k) { db[k] = db[k] || []; });
     db.entities = db.entities || DEFAULT_ENTITIES.map(function (e) { return { name: e.name, match: e.match.slice() }; });
     db.seq = db.seq || 0;
     db.acked = db.acked || 0;
@@ -505,6 +505,11 @@ globalThis.MyRA = (function () {
         if (cn) db.narratives[cn] = { id: String(op.id || ''), url: String(op.url || ''), excerpt: String(op.excerpt || ''), updated: n.day };
         break;
       }
+      case 'digest': {
+        db.digests.unshift({ date: String(op.date || n.day), url: String(op.url || ''), title: String(op.title || ''), lines: (op.lines || []).map(String).slice(0, 8), at: n.iso });
+        if (db.digests.length > 60) db.digests.length = 60;
+        break;
+      }
       case 'transcript_summary': { var st = session(db, op.date); st.transcriptSum = { url: String(op.url || ''), text: String(op.text || ''), at: n.day }; break; }
       case 'new_case_note': {
         db.newCases.forEach(function (x) { if (x.c === normCase(op.c)) { x.note = String(op.note || ''); x.routine = !!op.routine; } });
@@ -568,6 +573,7 @@ globalThis.MyRA = (function () {
               key: (p.key || []).map(function (fs) { var f = db.filings[fs]; return f ? compactFiling(f) : { fs: fs }; }), approved: p.approved || [] };
           }) };
       }),
+      digests: db.digests.slice(0, 20),
       newCases: db.newCases.slice(0, 60),
       deadlines: db.deadlines.filter(function (d) { return d.date >= n.day; }),
       entities: db.entities,
@@ -607,6 +613,7 @@ globalThis.MyRA = (function () {
     fillSheet(ss, 'Agenda', ['Session', 'Agenda', 'Item', 'Cases', 'Title', 'Picked'], items);
     fillSheet(ss, 'New cases', ['Opened', 'Case', 'Title', 'Type', 'Companies', 'Note', 'Link'],
       db.newCases.slice(0, 150).map(function (x) { return [x.d, x.c, x.title, x.type + (x.sub ? ' / ' + x.sub : ''), x.co, (x.routine ? '(routine) ' : '') + (x.note || ''), x.url]; }));
+    fillSheet(ss, 'Digests', ['Date', 'Digest', 'Highlights'], db.digests.map(function (g) { return [g.date, g.url, g.lines.join(' | ')]; }));
     fillSheet(ss, 'Deadlines', ['Date', 'Case', 'Event', 'Source'], db.deadlines.map(function (d) { return [d.date, d.c, d.event, d.src]; }));
     fillSheet(ss, 'Priority entities', ['Entity', 'Matches filer names containing'], db.entities.map(function (e) { return [e.name, e.match.join('; ')]; }));
     var s1 = ss.getSheetByName('Sheet1'); if (s1 && ss.getSheets().length > 1) ss.deleteSheet(s1);

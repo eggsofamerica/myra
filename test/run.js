@@ -103,6 +103,10 @@ ok(d.dockets['25-E-0764'] && d.dockets['25-E-0764'].tr, '"25-e-764" normalized t
 ok(d.addFailed.some(x => x.what === 'hello'), 'bad docket number reported');
 ok(!d.dockets['15-E-0302'].tr, '15-E-0302 untracked');
 
+send([{ op: 'digest', date: '2026-11-24', url: 'https://docs.google.com/document/d/dig1', title: 'MyRA digest', lines: ['a', 'b'] }]);
+MyRA.tick();
+ok(data().digests[0].url.includes('dig1') && sheets['Digests'].length === 2, 'digest recorded in data file and Sheet');
+
 // 7. Outputs
 const out = data();
 ok(out.dockets.find(k => k.c === '26-G-0384').narrative.excerpt === 'Rate freeze approved Nov 19.', 'dashboard data carries narrative');
