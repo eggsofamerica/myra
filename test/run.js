@@ -107,6 +107,11 @@ send([{ op: 'digest', date: '2026-11-24', url: 'https://docs.google.com/document
 MyRA.tick();
 ok(data().digests[0].url.includes('dig1') && sheets['Digests'].length === 2, 'digest recorded in data file and Sheet');
 
+send([{ op: 'renarrate', c: '26-G-0384' }]);
+MyRA.tick();
+const rn = events().filter(e => e.type === 'docket_added' && e.via === 'rebuild').pop();
+ok(rn && rn.c === '26-G-0384' && rn.narrative === 'doc123' && rn.commission.length > 0, 'renarrate queues a rebuild with the current narrative id');
+
 // 7. Outputs
 const out = data();
 ok(out.dockets.find(k => k.c === '26-G-0384').narrative.excerpt === 'Rate freeze approved Nov 19.', 'dashboard data carries narrative');

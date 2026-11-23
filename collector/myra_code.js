@@ -5,7 +5,7 @@
 globalThis.MyRA = (function () {
   'use strict';
   var CFG = {
-    VERSION: '2026-11-23.1',
+    VERSION: '2026-11-23.2',
     ROOT: 'YOUR_MYRA_FOLDER_ID',
     INBOX: 'YOUR_INBOX_FOLDER_ID',
     WORK: 'YOUR_WORK_FOLDER_ID',
@@ -226,13 +226,20 @@ globalThis.MyRA = (function () {
     k = db.dockets[c] = { c: c, seq: info.seq, title: info.title, ind: info.ind, mt: info.type, co: info.co, tr: true, added: nyNow().day, via: via || 'manual' };
     fullFetch(db, c, true);
     db.addFailed = db.addFailed.filter(function (x) { return x.what !== c; });
-    var all = filingsOf(db, [c]);
-    addEvent(db, { type: 'docket_added', c: c, title: k.title, ind: k.ind, co: k.co, via: k.via, url: caseUrl(c), nfilings: all.length,
-      commission: all.filter(function (f) { return f.cls === 'commission'; }).slice(0, 25).map(function (f) { return evFiling(f, true); }),
-      recent: all.filter(function (f) { return f.cls !== 'commission'; }).slice(0, 40).map(function (f) { return evFiling(f, false); }) });
+    var all = docketEvent(db, c, false);
     addActivity(db, c, 'now tracking (' + all.length + ' filings on record)');
     log('docket added ' + c + ' (' + all.length + ' filings)');
     return k;
+  }
+
+  // Queues a docket for a (re)written narrative: the Claude check reads its Commission documents.
+  function docketEvent(db, c, rebuild) {
+    var k = db.dockets[c], all = filingsOf(db, [c]);
+    addEvent(db, { type: 'docket_added', c: c, title: k.title, ind: k.ind, co: k.co, via: rebuild ? 'rebuild' : k.via, url: caseUrl(c), nfilings: all.length,
+      narrative: rebuild ? ((db.narratives[c] || {}).id || '') : '',
+      commission: all.filter(function (f) { return f.cls === 'commission'; }).slice(0, 25).map(function (f) { return evFiling(f, true); }),
+      recent: all.filter(function (f) { return f.cls !== 'commission'; }).slice(0, 40).map(function (f) { return evFiling(f, false); }) });
+    return all;
   }
 
   // ------------------------------------------------------------------ daily DMM checks
@@ -445,6 +452,7 @@ globalThis.MyRA = (function () {
     var n = nyNow();
     switch (op.op) {
       case 'track': case 'add_docket': addDocket(db, op.c, op.via || 'manual'); break;
+      case 'renarrate': { var cr = normCase(op.c); if (cr && db.dockets[cr]) { docketEvent(db, cr, true); addActivity(db, cr, 'narrative rebuild requested'); } break; }
       case 'untrack': { var c0 = normCase(op.c); if (c0 && db.dockets[c0]) { db.dockets[c0].tr = false; addActivity(db, c0, 'stopped tracking'); } break; }
       case 'pick': pickItem(db, op.date, op.no, op.on !== false, false); break;
       case 'agenda': {
