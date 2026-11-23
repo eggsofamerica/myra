@@ -9,7 +9,7 @@ A personal tracker for New York Public Service Commission activity: session agen
 - **docs/**: notes on the DMM data requests the collector uses.
 - **test/**: a Node harness that mocks the Apps Script services and runs the collector against live DMM and DPS data. Run `node test/run.js`.
 
-Still to come: the dashboard.
+- **dashboard/**: the home-screen page (a claude.ai artifact). It reads the dashboard data file through the viewer's Google Drive connector and sends requests (pick agenda items, approve key filings, summarize, add or untrack dockets, edit priority entities, rebuild a narrative) as small JSON files in the Drive inbox, which the collector reads within 5 minutes.
 
 ## Configuration
 

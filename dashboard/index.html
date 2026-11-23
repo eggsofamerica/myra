@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MyRA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: a regulatory docket board. Summary strip, then tabs (Today, Session, Dockets, New cases, Settings), one column on phones. */
+  --paper: #f2f4f2;
+  --card: #ffffff;
+  --ink: #16201c;
+  --muted: #5b6862;
+  --line: #d6ddd8;
+  --accent: #23684a;
+  --accent-soft: #e1efe7;
+  --good: #1e7a4c; --good-soft: #e1f2e8;
+  --warn: #946200; --warn-soft: #f8eed6;
+  --bad: #b3261e; --bad-soft: #f8e3e1;
+  --comm: #5a3d8f; --comm-soft: #ece6f6;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111614; --card: #19211e; --ink: #e5ece8; --muted: #98a69f; --line: #2c3833;
+    --accent: #79c39d; --accent-soft: #1a3027;
+    --good: #6cc797; --good-soft: #17302a; --warn: #e0b25a; --warn-soft: #33291a; --bad: #f08a80; --bad-soft: #3a1f1d;
+    --comm: #b9a2e6; --comm-soft: #2a2238;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111614; --card: #19211e; --ink: #e5ece8; --muted: #98a69f; --line: #2c3833;
+  --accent: #79c39d; --accent-soft: #1a3027;
+  --good: #6cc797; --good-soft: #17302a; --warn: #e0b25a; --warn-soft: #33291a; --bad: #f08a80; --bad-soft: #3a1f1d;
+  --comm: #b9a2e6; --comm-soft: #2a2238;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 15px/1.45 var(--body); -webkit-text-size-adjust: 100%; }
+a { color: var(--accent); }
+.wrap { max-width: 860px; margin: 0 auto; padding: 16px 16px 48px; display: grid; gap: 14px; }
+header { display: grid; gap: 6px; }
+.brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+h1 { font: 700 28px/1 var(--display); letter-spacing: .01em; margin: 0; }
+h2 { font: 600 17px/1.2 var(--display); letter-spacing: .02em; margin: 4px 0 0; text-wrap: balance; }
+.session { font: 600 14px var(--display); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.status { font-size: 13px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block; }
+.dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+.banner { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.banner.bad { border-color: var(--bad); background: var(--bad-soft); }
+.banner.warn { border-color: var(--warn); background: var(--warn-soft); }
+.strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.tile b { display: block; font: 700 24px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.tile span { font-size: 12px; color: var(--muted); }
+nav { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+nav button { font: 600 15px var(--display); letter-spacing: .02em; background: none; border: 0; color: var(--muted); padding: 10px 10px 9px; border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+nav button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+nav button:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tools input[type="text"] { flex: 1 1 200px; font: 15px var(--body); padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); min-width: 0; }
+.chip { font: 500 13px var(--body); border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 11px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.list { display: grid; gap: 10px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+.card.on { border-left: 4px solid var(--accent); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.num { font: 500 14px var(--mono); text-decoration: none; }
+.title { font-weight: 500; text-wrap: pretty; }
+.meta { font-size: 13px; color: var(--muted); }
+.pill { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .05em; padding: 3px 8px; border-radius: 999px; background: var(--paper); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.pill.comm { background: var(--comm-soft); color: var(--comm); border-color: transparent; }
+.pill.prio { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.pill.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+.pill.good { background: var(--good-soft); color: var(--good); border-color: transparent; }
+.pill.reg { background: var(--ink); color: var(--card); border-color: transparent; }
+.spacer { flex: 1; }
+.btn { font: 600 13px var(--body); border-radius: 8px; padding: 7px 12px; cursor: pointer; border: 1px solid var(--accent); background: var(--accent); color: var(--card); }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.small { font-size: 12px; padding: 4px 9px; }
+.btn[disabled] { opacity: .55; cursor: default; }
+.summary { border-top: 1px solid var(--line); padding-top: 8px; font-size: 14px; max-width: 70ch; }
+.summary p { margin: 0 0 6px; } .summary ul { margin: 0 0 6px; padding-left: 18px; }
+details summary { cursor: pointer; font-size: 13px; color: var(--accent); font-weight: 500; }
+details.fold { border-top: 1px solid var(--line); padding-top: 8px; }
+details.fold > summary { font: 600 14px var(--display); letter-spacing: .02em; padding: 2px 0; }
+.flist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.flist > li { display: grid; gap: 4px; padding-top: 8px; border-top: 1px solid var(--line); min-width: 0; }
+.flist > li:first-child { border-top: 0; padding-top: 0; }
+.ftitle { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.fmeta { font-size: 12px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-variant-numeric: tabular-nums; }
+.checks { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.checks label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+.checks input { margin-top: 3px; width: 17px; height: 17px; flex: none; accent-color: var(--accent); }
+.item { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; }
+.item .pick { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--accent); cursor: pointer; }
+.itemno { font: 600 14px var(--mono); }
+.secthead { font: 600 12px var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.note { font-size: 13px; background: var(--paper); border-radius: 8px; padding: 8px 10px; }
+.deadline { display: grid; grid-template-columns: 72px 1fr; gap: 8px; font-size: 14px; }
+.deadline time { font: 600 13px var(--mono); color: var(--warn); }
+.empty { color: var(--muted); font-size: 14px; padding: 12px 2px; }
+.add { display: flex; gap: 8px; flex-wrap: wrap; }
+.add input { flex: 1 1 180px; font: 15px var(--mono); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); min-width: 0; }
+.msg { font-size: 13px; color: var(--muted); }
+.msg.bad { color: var(--bad); }
+.pending { font-size: 12px; color: var(--warn); font-weight: 600; }
+.ent { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--line); }
+.ent:first-child { border-top: 0; }
+.ent b { font-weight: 600; }
+@media (max-width: 520px) { .strip { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 24px; } }
+@media (prefers-reduced-motion: no-preference) { .card { transition: border-color .15s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><h1>MyRA</h1><span class="session">NY PSC · sessions &amp; dockets</span></div>
+    <div class="status" id="status"><span class="dot warn"></span><span>Loading from your Google Drive…</span></div>
+  </header>
+  <div id="banner" class="banner" hidden></div>
+  <div class="strip">
+    <div class="tile"><b id="t-dockets">–</b><span>Tracked dockets</span></div>
+    <div class="tile"><b id="t-new">–</b><span>Filings in the last 7 days</span></div>
+    <div class="tile"><b id="t-session">–</b><span>Next PSC session</span></div>
+    <div class="tile"><b id="t-dead">–</b><span>Deadlines in 30 days</span></div>
+  </div>
+  <nav role="tablist" id="tabs">
+    <button role="tab" data-tab="today" id="tab-today">Today</button>
+    <button role="tab" data-tab="session" id="tab-session">Session</button>
+    <button role="tab" data-tab="dockets" id="tab-dockets">Dockets</button>
+    <button role="tab" data-tab="cases" id="tab-cases">New cases</button>
+    <button role="tab" data-tab="prefs" id="tab-prefs">Settings</button>
+  </nav>
+  <section id="view" aria-live="polite"></section>
+</div>
+<script>
+(function () {
+  var INBOX = 'YOUR_INBOX_FOLDER_ID';
+  var DATA_FILE = 'YOUR_DATA_FILE_ID';
+  var SHEET_URL = 'https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit';
+  var FOLDER_URL = 'https://drive.google.com/drive/folders/YOUR_MYRA_FOLDER_ID';
+  var DIGESTS_URL = 'https://drive.google.com/drive/folders/YOUR_DIGESTS_FOLDER_ID';
+  var CHECK_TASK = 'YOUR_TRIGGER_ID';
+  var SERVER = 'Google Drive';
+  var RUNNER = 'Claude Code Remote';
+  var DMM = 'https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=';
+
+  var state = { data: null, mcp: null, tab: 'today', pend: {}, sel: {}, ui: {}, msg: {}, runAt: 0, mineOnly: true, showRoutine: false };
+  function load_(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+  function save_(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  state.pend = load_('myra-pend', {});
+  state.ui = load_('myra-ui', {});
+  state.runAt = load_('myra-runAt', 0);
+  if (state.ui.tab) state.tab = state.ui.tab;
+  if (/^#(today|session|dockets|cases|prefs)$/.test(location.hash)) state.tab = location.hash.slice(1);
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function href(u) { return /^https:\/\//.test(String(u || '')) ? esc(u) : '#'; }
+  function md(s) {
+    var out = [], inList = false;
+    String(s || '').split('\n').forEach(function (line) {
+      var raw = line.trim(), t = esc(raw).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      if (/^[-•*]\s+/.test(raw)) { if (!inList) { out.push('<ul>'); inList = true; } out.push('<li>' + t.replace(/^[-•*]\s+/, '') + '</li>'); return; }
+      if (inList) { out.push('</ul>'); inList = false; }
+      if (/^#{1,4}\s/.test(raw)) { out.push('<p><strong>' + t.replace(/^#+\s*/, '') + '</strong></p>'); return; }
+      if (t) out.push('<p>' + t + '</p>');
+    });
+    if (inList) out.push('</ul>');
+    return out.join('');
+  }
+  function day(d) { return new Date(String(d).slice(0, 10) + 'T12:00:00'); }
+  function daysFrom(d) { return d ? (day(d).getTime() - Date.now()) / 864e5 : 1e9; }
+  function fmtDate(d, withDay) {
+    if (!d) return '';
+    var x = day(d);
+    if (isNaN(x)) return esc(d);
+    var o = { month: 'short', day: 'numeric' };
+    if (x.getFullYear() !== new Date().getFullYear()) o.year = 'numeric';
+    if (withDay) o.weekday = 'short';
+    return x.toLocaleDateString('en-US', o);
+  }
+
+  // ---------- reading the data file through the Google Drive connector
+  function b64ToText(b) {
+    var bin = atob(b.replace(/\s/g, '')), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+  function findData(result) {
+    var found = null;
+    function ok(j) { return j && typeof j === 'object' && j.asof && Array.isArray(j.dockets); }
+    function tryStr(s) {
+      if (found || typeof s !== 'string' || s.length < 2) return;
+      var t = s.trim();
+      if (t.charAt(0) === '{') { try { var j = JSON.parse(t); if (ok(j)) { found = j; return; } } catch (e) {} }
+      if (/^[A-Za-z0-9+/=\s]+$/.test(t) && t.length > 8) { try { var u = b64ToText(t); if (u.trim().charAt(0) === '{') { var k = JSON.parse(u); if (ok(k)) found = k; } } catch (e) {} }
+    }
+    function walk(o, depth) {
+      if (found || depth > 6 || o == null) return;
+      if (typeof o === 'string') return tryStr(o);
+      if (typeof o === 'object') { if (ok(o)) { found = o; return; } Object.keys(o).forEach(function (k) { walk(o[k], depth + 1); }); }
+    }
+    walk(result && result.payload, 0); walk(result && result.content, 0); walk(result, 0);
+    return found;
+  }
+  function errorText(err) {
+    var code = err && err.code;
+    if (code === 'needs_reauth') return 'Your Google Drive connection has lapsed. Reconnect Google Drive in claude.ai Settings → Connectors, then reload.';
+    if (code === 'server_not_connected' || code === 'selection_required') return 'MyRA reads its data from Google Drive. Add or choose the Google Drive connector in claude.ai Settings → Connectors, then reload.';
+    if (code === 'not_in_manifest' || code === 'approval_required' || code === 'not_granted' || code === 'consent_required') return 'MyRA needs your OK to use Google Drive. Reload and allow Google Drive when asked.';
+    if (code === 'server_unavailable') return 'Google Drive didn\'t answer just now. Try again in a minute.';
+    return 'Could not reach Google Drive' + (err && err.message ? ' (' + esc(String(err.message).slice(0, 140)) + ')' : '') + '.';
+  }
+  function banner(html, kind) { var b = $('banner'); b.className = 'banner ' + (kind || ''); b.innerHTML = html; b.hidden = !html; }
+  function setStatus(kind, html) { $('status').innerHTML = '<span class="dot ' + (kind || '') + '"></span><span>' + html + '</span>'; }
+
+  function load() {
+    claude.use('mcp').then(function (mcp) {
+      state.mcp = mcp;
+      if (!mcp) { setStatus('bad', 'This view can\'t reach Google Drive. Open MyRA on claude.ai.'); render(); return; }
+      mcp.callTool(SERVER, 'download_file_content', { fileId: DATA_FILE }, { cache: { staleTime: 2 * 60000, gcTime: 7 * 864e5 } })
+        .then(function (r) { var d = findData(r); if (d) accept(d); else fallbackRead(mcp); startWatch(mcp); loadInbox(mcp); })
+        .catch(function (e) { onError(mcp, e); });
+    });
+  }
+  function startWatch(mcp) {
+    mcp.watchTool(SERVER, 'download_file_content', { fileId: DATA_FILE }, function (ev) {
+      if (ev.type === 'data') { var d = findData(ev.result); if (d) accept(d); }
+      else if (!(ev.error && ev.error.code === 'server_unavailable' && state.data)) onError(mcp, ev.error);
+    }, { cache: { staleTime: 5 * 60000, gcTime: 7 * 864e5 }, refetchInterval: 2 * 60000 });
+  }
+  function fallbackRead(mcp) {
+    mcp.callTool(SERVER, 'read_file_content', { fileId: DATA_FILE }).then(function (r) {
+      var d = findData(r);
+      if (d) accept(d); else banner('MyRA\'s data file is empty. If you just set MyRA up, wait a few minutes for the collector\'s first run.', 'warn');
+    }).catch(function (e) { banner(errorText(e), 'bad'); });
+  }
+  function onError(mcp, err) {
+    var code = err && err.code, msg = errorText(err);
+    if (code === 'approval_required' || code === 'not_granted' || code === 'consent_required') msg += ' <button class="btn small" id="allow">Allow and load</button>';
+    banner(msg, code === 'server_unavailable' ? 'warn' : 'bad');
+    var a = $('allow');
+    if (a) a.onclick = function () { a.disabled = true; mcp.callTool(SERVER, 'download_file_content', { fileId: DATA_FILE }).then(function (r) { var d = findData(r); if (d) { banner(''); accept(d); startWatch(mcp); } }).catch(function (e) { onError(mcp, e); }); };
+    render();
+  }
+  // Requests still waiting in the Drive inbox, so "Sent" shows on every device and after a reload.
+  function loadInbox(mcp) {
+    mcp.callTool(SERVER, 'search_files', { query: "parentId = '" + INBOX + "' and trashed = false", excludeContentSnippets: true, pageSize: 100 }, { cache: false })
+      .then(function (r) {
+        var files = (r && r.payload && r.payload.files) || [];
+        files.forEach(function (f) {
+          var m = String(f.title || '').match(/^dash__(.+)__(\d+)\.json$/);
+          if (m && !state.pend[m[1]]) state.pend[m[1]] = Number(m[2]);
+        });
+        save_('myra-pend', state.pend); render();
+      }).catch(function () {});
+  }
+
+  // ---------- lookups
+  function dockets() { return (state.data && state.data.dockets) || []; }
+  function docket(c) { return dockets().filter(function (k) { return k.c === c; })[0]; }
+  function allFilings() {
+    var out = [];
+    dockets().forEach(function (k) { (k.filings || []).forEach(function (f) { out.push(f); }); });
+    return out;
+  }
+  function filingByFs(fs) {
+    var hit = null;
+    dockets().forEach(function (k) { (k.filings || []).forEach(function (f) { if (f.fs === fs) hit = f; }); });
+    (state.data && state.data.sessions || []).forEach(function (s) { (s.items || []).forEach(function (it) { (it.key || []).forEach(function (f) { if (!hit && f.fs === fs && f.t) hit = f; }); }); });
+    return hit;
+  }
+  function session() {
+    var ss = (state.data && state.data.sessions) || [], next = state.data && state.data.next;
+    var withItems = ss.filter(function (s) { return s.items && s.items.length; });
+    var upcoming = withItems.filter(function (s) { return daysFrom(s.date) > -1; });
+    return upcoming[0] || withItems[0] || (next ? { date: next.date, url: next.url, items: [] } : null);
+  }
+
+  // Drop "Sent" flags once the change shows in the data, or after they go stale.
+  function settle() {
+    var now = Date.now();
+    Object.keys(state.pend).forEach(function (k) {
+      var at = state.pend[k], parts = k.split(':'), kind = parts[0], done = false;
+      if (kind === 'track' || kind === 'add') { var d = docket(parts[1]); done = !!(d && d.tr); }
+      else if (kind === 'untrack') { var u = docket(parts[1]); done = !!(u && !u.tr); }
+      else if (kind === 'pick' || kind === 'unpick') {
+        var s = (state.data.sessions || []).filter(function (x) { return x.date === parts[1]; })[0];
+        var it = s && (s.items || []).filter(function (x) { return x.no === parts[2]; })[0];
+        done = !!(it && it.on === (kind === 'pick'));
+      }
+      else if (kind === 'entadd') done = (state.data.entities || []).some(function (e) { return safeKey(e.name).toLowerCase() === parts.slice(1).join(':').toLowerCase(); });
+      else if (kind === 'entdel') done = !(state.data.entities || []).some(function (e) { return safeKey(e.name).toLowerCase() === parts.slice(1).join(':').toLowerCase(); });
+      else if (kind === 'sum' || kind === 'parts') { var f = filingByFs(parts[1]); done = !!(f && f.sumAt && Date.parse(f.sumAt + 'T23:59:59') > at && (kind === 'sum' ? f.sum : (f.partSums || []).length)); }
+      else if (kind === 'renarr') { var n = docket(parts[1]); done = !!(n && n.narrative && Date.parse(n.narrative.updated + 'T23:59:59') > at); }
+      var limit = (kind === 'sum' || kind === 'parts' || kind === 'renarr' || kind === 'approve') ? 4 * 864e5 : 2 * 3600e3;
+      if (done || now - at > limit) delete state.pend[k];
+    });
+    save_('myra-pend', state.pend);
+  }
+  function safeKey(k) { return String(k).replace(/[^A-Za-z0-9.:_-]/g, '_'); }
+  function pending(k) { return !!state.pend[safeKey(k)]; }
+
+  function accept(d) {
+    state.data = d;
+    settle();
+    if (d.errors && d.errors.length && daysFrom(d.errors[0].at) > -1.5) banner('The collector reported a problem: ' + esc(d.errors[0].msg), 'warn'); else banner('');
+    var when = d.lastCheck || d.asof;
+    setStatus(d.errors && d.errors.length && daysFrom(d.errors[0].at) > -1.5 ? 'warn' : '', 'Updated ' + esc(new Date(when).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })) + ' · <a href="' + href(SHEET_URL) + '">Sheet</a> · <a href="' + href(DIGESTS_URL) + '">Digests</a>');
+    render();
+  }
+
+  // ---------- sending requests to MyRA (a small JSON file in the Drive inbox; the collector reads it within 5 minutes)
+  function send(key, op, btn, okMsg) {
+    if (!state.mcp) return;
+    var was = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    var safe = safeKey(key);
+    state.mcp.callTool(SERVER, 'create_file', { title: 'dash__' + safe + '__' + Date.now() + '.json', parentId: INBOX, contentMimeType: 'text/plain', textContent: JSON.stringify({ ops: [op] }), disableConversionToGoogleType: true }, { cache: false })
+      .then(function () { state.pend[safe] = Date.now(); save_('myra-pend', state.pend); if (okMsg) state.msg[okMsg[0]] = okMsg[1]; render(); })
+      .catch(function (e) {
+        if (btn) { btn.disabled = false; btn.textContent = was; }
+        var code = e && e.code;
+        banner((code === 'server_unavailable' || code === 'upstream_error') ? 'Not sure that reached Google Drive. Wait a few minutes and check before trying again.' : errorText(e), 'bad');
+      });
+  }
+  function runCheck(btn) {
+    if (!state.mcp) return;
+    btn.disabled = true; btn.textContent = 'Starting…';
+    state.mcp.callTool(RUNNER, 'fire_trigger', { trigger_id: CHECK_TASK }, { cache: false })
+      .then(function () { state.runAt = Date.now(); save_('myra-runAt', state.runAt); render(); })
+      .catch(function (e) { btn.disabled = false; btn.textContent = 'Run the check now'; banner('Couldn\'t start the check: ' + errorText(e), 'bad'); });
+  }
+
+  // ---------- pieces
+  function clsPill(f) {
+    if (f.cls === 'commission') return '<span class="pill comm">Commission</span>';
+    if (f.cls === 'priority') return '<span class="pill prio">' + esc(f.ent || 'Priority') + '</span>';
+    return '';
+  }
+  function filingLink(f) {
+    var u = f.docs && f.docs[0] && f.docs[0].url;
+    return u ? '<a href="' + href(u) + '">' + esc(f.t || f.type) + '</a>' : esc(f.t || f.type);
+  }
+  function filingRow(f, opts) {
+    opts = opts || {};
+    var h = '<li><div class="ftitle">' + filingLink(f) + '</div><div class="fmeta"><span>' + fmtDate(f.d) + '</span><span>·</span><span>' + esc(f.filer) + '</span><span>·</span><span>' + esc(f.type) + '</span>' +
+      (f.n > 1 ? '<span>· ' + f.n + ' documents</span>' : '') + (f.pages ? '<span>· ' + esc(f.pages) + ' pp.</span>' : '') + clsPill(f) + '</div>';
+    if (f.docs && f.docs.length > 1) h += '<details><summary>All documents</summary><ul class="flist" style="margin-top:6px">' + f.docs.map(function (d) { return '<li class="meta"><a href="' + href(d.url) + '">' + esc(d.t) + '</a> ' + esc(d.sz || '') + '</li>'; }).join('') + '</ul></details>';
+    if (f.sum) {
+      h += '<details' + (opts.open ? ' open' : '') + '><summary>Summary' + (f.scope === 'start' ? ' (opening pages)' : '') + '</summary><div class="summary">' + md(f.sum) + '</div></details>';
+      (f.partSums || []).forEach(function (p) { h += '<details><summary>Section: ' + esc(p.label) + '</summary><div class="summary">' + md(p.text) + '</div></details>'; });
+      var sugg = (f.sugg || []).filter(function (s) { return !(f.partSums || []).some(function (p) { return p.label === s.label; }); });
+      if (sugg.length) {
+        var sk = 'parts:' + f.fs;
+        if (pending(sk)) h += '<span class="pending">Section summaries requested</span>';
+        else h += '<details><summary>Read more of this filing</summary><ul class="checks">' + sugg.map(function (s, i) {
+          return '<li><label><input type="checkbox" data-part="' + esc(f.fs) + '" data-i="' + i + '"' + (state.sel[f.fs + '#' + i] ? ' checked' : '') + '> <span>' + esc(s.label) + (s.where ? ' <span class="meta">(' + esc(s.where.replace(/^1:/, 'pp. ')) + ')</span>' : '') + '</span></label></li>';
+        }).join('') + '</ul><div class="row" style="margin-top:6px"><button class="btn small" data-parts="' + esc(f.fs) + '">Summarize selected sections</button></div></details>';
+      }
+    } else if (f.st === 'queued' || f.st === 'requested' || pending('sum:' + f.fs)) {
+      h += '<span class="pending">Summary coming with the next check</span>';
+    } else if (!opts.noButton) {
+      h += '<div><button class="btn ghost small" data-sum="' + esc(f.fs) + '">Summarize</button></div>';
+    }
+    return h + '</li>';
+  }
+  function deadlineRows(list) {
+    return list.map(function (d) { return '<div class="deadline"><time>' + fmtDate(d.date) + '</time><span>' + esc(d.event) + ' <span class="meta">' + esc(d.c) + '</span></span></div>'; }).join('');
+  }
+
+  // ---------- views
+  function viewToday() {
+    var d = state.data, h = '';
+    var dg = (d.digests || [])[0];
+    h += '<div class="card"><h2>Latest digest</h2>';
+    if (dg) h += '<div class="meta">' + fmtDate(dg.date, true) + '</div><ul class="summary" style="border:0;padding:0;margin:0 0 0 18px">' + (dg.lines || []).map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul><div><a href="' + href(dg.url) + '">Open the digest</a></div>';
+    else h += '<div class="empty">No digest yet. MyRA writes one on mornings when there is news.</div>';
+    var older = (d.digests || []).slice(1, 6);
+    if (older.length) h += '<details class="fold"><summary>Earlier digests</summary><ul class="flist" style="margin-top:6px">' + older.map(function (g) { return '<li><a href="' + href(g.url) + '">' + fmtDate(g.date, true) + '</a> <span class="meta">' + esc((g.lines || [])[0] || '') + '</span></li>'; }).join('') + '</ul></details>';
+    h += '</div>';
+    var dl = (d.deadlines || []).filter(function (x) { return daysFrom(x.date) <= 60; });
+    h += '<div class="card"><h2>Coming up</h2>';
+    var s = session();
+    if (s && daysFrom(s.date) > -1) h += '<div class="deadline"><time>' + fmtDate(s.date) + '</time><span>PSC session' + (s.url ? ' · <a href="' + href(s.url) + '">event page</a>' : '') + '</span></div>';
+    h += dl.length ? deadlineRows(dl) : '<div class="meta">No deadlines in the next 60 days.</div>';
+    h += '</div>';
+    var act = (d.activity || []).slice(0, 12);
+    if (act.length) h += '<div class="card"><h2>Recent activity</h2><ul class="flist">' + act.map(function (a) { return '<li class="meta">' + esc(new Date(a.ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) + ' · ' + (a.c ? '<span class="num">' + esc(a.c) + '</span> ' : '') + esc(a.text) + '</li>'; }).join('') + '</ul></div>';
+    var recent = Date.now() - state.runAt < 15 * 60000;
+    h += '<div class="card"><div class="row"><div class="meta" style="flex:1 1 260px">The check runs each weekday at 6:49 a.m. Run it now to get summaries you requested without waiting for tomorrow.</div><button class="btn ghost" id="run"' + (recent ? ' disabled' : '') + '>' + (recent ? 'Check started' : 'Run the check now') + '</button></div></div>';
+    return h;
+  }
+  function viewSession() {
+    var s = session(), h = '';
+    if (!s) return '<div class="empty">No session on record yet.</div>';
+    h += '<div class="card"><div class="row"><h2 style="margin:0">PSC session · ' + fmtDate(s.date, true) + '</h2><span class="spacer"></span>' + (s.url ? '<a class="meta" href="' + href(s.url) + '">Event page</a>' : '') + '</div>';
+    var links = [];
+    if (s.preliminary) links.push('<a href="' + href(s.preliminary.pdf || s.preliminary.page) + '">Preliminary agenda</a>');
+    if (s.final) links.push('<a href="' + href(s.final.pdf || s.final.page) + '">Final agenda</a>');
+    if (s.consent) links.push('<a href="' + href(s.consent.pdf || s.consent.page) + '">Consent summary</a>');
+    if (s.transcript) links.push('<a href="' + href(s.transcript.pdf || s.transcript.page) + '">Transcript</a>');
+    if (links.length) h += '<div class="row meta">' + links.join(' · ') + '</div>';
+    if (s.changes) h += '<div class="note"><strong>Final agenda changes:</strong> ' + esc(s.changes) + '</div>';
+    if (s.transcriptSum) h += '<div class="note"><strong>Discussion of your items:</strong> ' + esc(s.transcriptSum.text) + (s.transcriptSum.url ? ' <a href="' + href(s.transcriptSum.url) + '">Full review</a>' : '') + '</div>';
+    if (!s.items || !s.items.length) {
+      var exp = new Date(day(s.date).getTime() - 6 * 864e5);
+      h += '<div class="meta">The preliminary agenda usually posts about a week ahead (around ' + exp.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '). MyRA will list its items here and alert you.</div></div>';
+      return h;
+    }
+    var mine = s.items.filter(function (it) { return it.on; }).length;
+    h += '<div class="row"><span class="meta">' + s.items.length + ' items · ' + mine + ' picked. Picking an item tracks its docket and asks MyRA for the filings to read first.</span></div>';
+    h += '<div class="tools"><button class="chip" id="mine" aria-pressed="' + state.mineOnly + '">Picked and regular items only</button></div></div>';
+    ['regular', 'consent'].forEach(function (ag) {
+      var items = s.items.filter(function (it) { return it.agenda === ag && (!state.mineOnly || ag === 'regular' || it.on); });
+      if (!items.length) return;
+      h += '<div class="secthead">' + (ag === 'regular' ? 'Regular agenda (discussed)' : 'Consent agenda') + '</div><div class="list">';
+      items.forEach(function (it) {
+        var pk = (it.on ? 'unpick:' : 'pick:') + s.date + ':' + it.no, waiting = pending('pick:' + s.date + ':' + it.no) || pending('unpick:' + s.date + ':' + it.no);
+        h += '<div class="card' + (it.on ? ' on' : '') + '"><div class="item"><input type="checkbox" class="pick" aria-label="Pick item ' + esc(it.no) + '" data-pick="' + esc(it.no) + '" data-date="' + esc(s.date) + '"' + (it.on ? ' checked' : '') + (waiting ? ' disabled' : '') + '>' +
+          '<div style="display:grid;gap:4px;min-width:0"><div class="row"><span class="itemno">' + esc(it.no) + '</span>' + it.cases.map(function (c) { return '<a class="num" href="' + href(DMM + c) + '">' + esc(c) + '</a>'; }).join(' ') + '<span class="pill">' + esc(it.section) + '</span>' + (it.auto ? '<span class="pill prio">Your docket</span>' : '') + '</div>' +
+          '<div class="title">' + esc(it.title) + '</div>' + (waiting ? '<span class="pending">Sent. MyRA updates this within 5 minutes.</span>' : '');
+        if (it.on) h += keyFilings(s, it);
+        h += '</div></div></div>';
+      });
+      h += '</div>';
+    });
+    return h;
+  }
+  function keyFilings(s, it) {
+    if (!it.key || !it.key.length) return '<div class="meta">MyRA is choosing the key filings for this item; they arrive with the next check.</div>';
+    var h = '';
+    if (it.note) h += '<div class="note">' + esc(it.note) + '</div>';
+    var ak = 'approve:' + s.date + ':' + it.no, approved = it.approved || [];
+    h += '<div class="meta">Key filings to read first. Untick any you don\'t need, then ask for summaries.</div><ul class="checks">';
+    it.key.forEach(function (f) {
+      var id = s.date + '|' + it.no + '|' + f.fs, chosen = state.sel[id] !== false;
+      h += '<li><label><input type="checkbox" data-key="' + esc(id) + '"' + (chosen ? ' checked' : '') + (f.sum || approved.indexOf(f.fs) >= 0 ? ' disabled' : '') + '> <span>' + (f.t ? filingLink(f) : esc(f.fs)) + ' <span class="meta">' + fmtDate(f.d) + ' · ' + esc(f.filer || '') + '</span>' + (f.sum ? ' <span class="pill good">Summarized</span>' : (approved.indexOf(f.fs) >= 0 ? ' <span class="pill warn">Requested</span>' : '')) + '</span></label>' +
+        (f.sum ? '<details><summary>Summary</summary><div class="summary">' + md(f.sum) + '</div></details>' : '') + '</li>';
+    });
+    h += '</ul>';
+    var open = it.key.filter(function (f) { return !f.sum && approved.indexOf(f.fs) < 0; });
+    if (pending(ak)) h += '<span class="pending">Summaries requested. They arrive with the next check.</span>';
+    else if (open.length) h += '<div class="row"><button class="btn small" data-approve="' + esc(it.no) + '" data-date="' + esc(s.date) + '">Summarize selected filings</button><span class="meta">Add another filing from the Dockets tab with its Summarize button.</span></div>';
+    return h;
+  }
+  function viewDockets() {
+    var h = '<div class="card"><h2>Add a docket</h2><form class="add" id="addform"><label for="addc" class="meta" style="flex-basis:100%">Case or matter number, like 26-G-0384</label><input id="addc" type="text" autocomplete="off" placeholder="26-E-0123" aria-label="Case number"><button class="btn" type="submit">Track</button></form>';
+    if (state.msg.add) h += '<div class="msg">' + esc(state.msg.add) + '</div>';
+    var fails = (state.data.addFailed || []).filter(function (x) { return daysFrom(x.at) > -2; });
+    if (fails.length) h += fails.map(function (x) { return '<div class="msg bad">Couldn\'t add ' + esc(x.what) + ': ' + esc(x.why) + '</div>'; }).join('');
+    var waitingAdds = Object.keys(state.pend).filter(function (k) { return /^add:/.test(k) && !docket(k.slice(4)); });
+    if (waitingAdds.length) h += '<div class="pending">Adding ' + waitingAdds.map(function (k) { return esc(k.slice(4)); }).join(', ') + '. It shows up here within 5 minutes; its narrative comes with the next check.</div>';
+    h += '</div>';
+    var on = dockets().filter(function (k) { return k.tr; }), off = dockets().filter(function (k) { return !k.tr; });
+    if (!on.length) h += '<div class="empty">No tracked dockets.</div>';
+    on.forEach(function (k) {
+      var fl = k.filings || [], hist = k.history || [], rn = pending('renarr:' + k.c), un = pending('untrack:' + k.c);
+      h += '<div class="card on"><div class="row"><a class="num" href="' + href(k.url) + '">' + esc(k.c) + '</a><span class="pill">' + esc(k.ind || '') + '</span><span class="meta">' + esc(k.nfilings) + ' filings' + (k.comments && k.comments.total ? ' · ' + esc(k.comments.total) + ' public comments since tracking' : '') + '</span><span class="spacer"></span>' +
+        (un ? '<span class="pending">Stopping…</span>' : '<button class="btn ghost small" data-untrack="' + esc(k.c) + '">Stop tracking</button>') + '</div>';
+      h += '<div class="title">' + esc(k.title) + '</div>';
+      if (k.narrative) h += '<div class="note"><strong>State of play</strong> <span class="meta">(' + fmtDate(k.narrative.updated) + ')</span><br>' + esc(k.narrative.excerpt) + ' <a href="' + href(k.narrative.url) + '">Full narrative</a></div>';
+      else h += '<div class="meta">Narrative coming with the next check.</div>';
+      if (k.deadlines && k.deadlines.length) h += deadlineRows(k.deadlines);
+      if (fl.length) h += '<details class="fold"' + (state.ui['open:' + k.c] ? ' open' : '') + ' data-fold="' + esc(k.c) + '"><summary>New and summarized filings (' + fl.length + ')</summary><ul class="flist" style="margin-top:8px">' + fl.map(function (f) { return filingRow(f); }).join('') + '</ul></details>';
+      if (hist.length) h += '<details class="fold"><summary>Earlier filings (' + hist.length + ' most recent)</summary><ul class="flist" style="margin-top:8px">' + hist.map(function (f) {
+        return '<li><div class="ftitle">' + esc(f.t || f.type) + '</div><div class="fmeta"><span>' + fmtDate(f.d) + '</span><span>·</span><span>' + esc(f.filer) + '</span>' + clsPill(f) + (pending('sum:' + f.fs) ? '<span class="pending">Summary requested</span>' : '<button class="btn ghost small" data-sum="' + esc(f.fs) + '">Summarize</button>') + '</div></li>';
+      }).join('') + '</ul></details>';
+      h += '<div class="row">' + (rn ? '<span class="pending">Rebuilding the narrative with the next check</span>' : '<button class="btn ghost small" data-renarr="' + esc(k.c) + '">Rebuild narrative</button>') + '</div></div>';
+    });
+    if (off.length) h += '<details class="fold"><summary>Not tracked (' + off.length + ')</summary><div class="list" style="margin-top:8px">' + off.map(function (k) {
+      return '<div class="row"><a class="num" href="' + href(k.url) + '">' + esc(k.c) + '</a><span class="meta" style="flex:1 1 200px">' + esc(k.title) + '</span>' + (pending('track:' + k.c) ? '<span class="pending">Tracking…</span>' : '<button class="btn ghost small" data-track="' + esc(k.c) + '">Track again</button>') + '</div>';
+    }).join('') + '</div></details>';
+    return h;
+  }
+  function viewCases() {
+    var all = state.data.newCases || [], shown = all.filter(function (x) { return state.showRoutine || !x.routine; });
+    var h = '<div class="tools"><span class="meta" style="flex:1 1 240px">Electric, gas and general cases opened since MyRA started. Routine ones are hidden.</span><button class="chip" id="routine" aria-pressed="' + state.showRoutine + '">Show routine (' + all.filter(function (x) { return x.routine; }).length + ')</button></div>';
+    if (!shown.length) return h + '<div class="empty">No new cases yet. MyRA checks every weekday morning.</div>';
+    h += '<div class="list">' + shown.map(function (x) {
+      var k = docket(x.c), tracked = k && k.tr, waiting = pending('add:' + x.c);
+      return '<div class="card' + (tracked ? ' on' : '') + '"><div class="row"><a class="num" href="' + href(x.url) + '">' + esc(x.c) + '</a><span class="meta">Opened ' + fmtDate(x.d) + ' · ' + esc(x.type) + (x.sub ? ' / ' + esc(x.sub) : '') + '</span>' + (x.routine ? '<span class="pill">Routine</span>' : '') + '<span class="spacer"></span>' +
+        (tracked ? '<span class="pill good">Tracked</span>' : waiting ? '<span class="pending">Adding…</span>' : '<button class="btn ghost small" data-add="' + esc(x.c) + '">Track</button>') + '</div>' +
+        '<div class="title">' + esc(x.title) + '</div>' + (x.co ? '<div class="meta">' + esc(x.co) + '</div>' : '') + (x.note ? '<div class="note">' + esc(x.note) + '</div>' : '') + '</div>';
+    }).join('') + '</div>';
+    return h;
+  }
+  function viewSettings() {
+    var ents = state.data.entities || [];
+    var h = '<div class="card"><h2>Priority entities</h2><div class="meta">Filings by these parties are summarized automatically. MyRA matches a filer when its DMM name contains any of the listed names.</div><div>';
+    h += ents.map(function (e) {
+      var k = 'entdel:' + e.name;
+      return '<div class="ent"><b>' + esc(e.name) + '</b><span class="meta" style="flex:1 1 200px">' + esc(e.match.join('; ')) + '</span>' + (pending(k) ? '<span class="pending">Removing…</span>' : '<button class="btn ghost small" data-entdel="' + esc(e.name) + '">Remove</button>') + '</div>';
+    }).join('');
+    Object.keys(state.pend).filter(function (k) { return /^entadd:/.test(k); }).forEach(function (k) { h += '<div class="ent"><b>' + esc(k.slice(7).replace(/_/g, ' ')) + '</b><span class="pending">Adding…</span></div>'; });
+    h += '</div><form id="entform" style="display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px"><label class="meta" for="entname">Add an entity</label><div class="add"><input id="entname" type="text" placeholder="Name, e.g. NRDC" aria-label="Entity name"></div>' +
+      '<label class="meta" for="entmatch">Names as they appear in DMM, separated by commas (optional; defaults to the name above)</label><div class="add"><input id="entmatch" type="text" placeholder="National Resources Defense Council, Natural Resources Defense Council" aria-label="Names as they appear in DMM"><button class="btn" type="submit">Add</button></div></form></div>';
+    h += '<div class="card"><h2>Where things live</h2><div class="row"><a href="' + href(SHEET_URL) + '">MyRA Sheet</a><a href="' + href(FOLDER_URL) + '">Drive folder</a><a href="' + href(DIGESTS_URL) + '">Digests</a></div>' +
+      '<div class="meta">The collector checks DMM and the DPS website each weekday around 6 a.m. The check writes summaries and the digest at 6:49 a.m. Requests you make here reach the collector within 5 minutes; summaries come with the next check, or sooner with "Run the check now" on the Today tab.</div></div>';
+    return h;
+  }
+
+  function render() {
+    var d = state.data;
+    ['today', 'session', 'dockets', 'cases', 'prefs'].forEach(function (t) { var b = $('tab-' + t); b.setAttribute('aria-selected', String(state.tab === t)); });
+    if (!d) { $('view').innerHTML = '<div class="empty">' + (state.mcp === null ? '' : 'Loading…') + '</div>'; return; }
+    var tr = dockets().filter(function (k) { return k.tr; });
+    $('t-dockets').textContent = tr.length;
+    var recentN = 0; tr.forEach(function (k) { (k.filings || []).concat(k.history || []).forEach(function (f) { if (daysFrom(f.d) > -7) recentN++; }); });
+    $('t-new').textContent = recentN;
+    var s = session();
+    $('t-session').textContent = s && daysFrom(s.date) > -1 ? day(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '–';
+    $('t-dead').textContent = (d.deadlines || []).filter(function (x) { return daysFrom(x.date) <= 30; }).length;
+    var v = state.tab === 'session' ? viewSession() : state.tab === 'dockets' ? viewDockets() : state.tab === 'cases' ? viewCases() : state.tab === 'prefs' ? viewSettings() : viewToday();
+    $('view').innerHTML = v;
+    wire();
+  }
+  function wire() {
+    var view = $('view');
+    view.querySelectorAll('[data-sum]').forEach(function (b) { b.onclick = function () { send('sum:' + b.dataset.sum, { op: 'summarize', fs: b.dataset.sum }, b); }; });
+    view.querySelectorAll('[data-parts]').forEach(function (b) { b.onclick = function () {
+      var fs = b.dataset.parts, f = filingByFs(fs), labels = [];
+      view.querySelectorAll('[data-part="' + fs + '"]').forEach(function (c) { if (c.checked) labels.push(f.sugg[Number(c.dataset.i)].label); });
+      if (!labels.length) { b.textContent = 'Tick at least one section'; return; }
+      send('parts:' + fs, { op: 'summarize', fs: fs, parts: labels }, b);
+    }; });
+    view.querySelectorAll('[data-part]').forEach(function (c) { c.onchange = function () { state.sel[c.dataset.part + '#' + c.dataset.i] = c.checked; }; });
+    view.querySelectorAll('[data-key]').forEach(function (c) { c.onchange = function () { state.sel[c.dataset.key] = c.checked; }; });
+    view.querySelectorAll('[data-pick]').forEach(function (c) { c.onchange = function () {
+      var on = c.checked, date = c.dataset.date, no = c.dataset.pick;
+      send((on ? 'pick:' : 'unpick:') + date + ':' + no, { op: 'pick', date: date, no: no, on: on }, null);
+      c.disabled = true;
+    }; });
+    view.querySelectorAll('[data-approve]').forEach(function (b) { b.onclick = function () {
+      var s = session(), no = b.dataset.approve, it = (s.items || []).filter(function (x) { return x.no === no; })[0];
+      var fs = it.key.filter(function (f) { return !f.sum && (it.approved || []).indexOf(f.fs) < 0 && state.sel[s.date + '|' + no + '|' + f.fs] !== false; }).map(function (f) { return f.fs; });
+      if (!fs.length) { b.textContent = 'Tick at least one filing'; return; }
+      send('approve:' + s.date + ':' + no, { op: 'approve', date: s.date, no: no, fs: fs }, b);
+    }; });
+    view.querySelectorAll('[data-untrack]').forEach(function (b) { b.onclick = function () { send('untrack:' + b.dataset.untrack, { op: 'untrack', c: b.dataset.untrack }, b); }; });
+    view.querySelectorAll('[data-track]').forEach(function (b) { b.onclick = function () { send('track:' + b.dataset.track, { op: 'track', c: b.dataset.track }, b); }; });
+    view.querySelectorAll('[data-add]').forEach(function (b) { b.onclick = function () { send('add:' + b.dataset.add, { op: 'add_docket', c: b.dataset.add, via: 'new case' }, b); }; });
+    view.querySelectorAll('[data-renarr]').forEach(function (b) { b.onclick = function () { send('renarr:' + b.dataset.renarr, { op: 'renarrate', c: b.dataset.renarr }, b); }; });
+    view.querySelectorAll('[data-entdel]').forEach(function (b) { b.onclick = function () { send('entdel:' + b.dataset.entdel, { op: 'entity_remove', name: b.dataset.entdel }, b); }; });
+    view.querySelectorAll('details[data-fold]').forEach(function (dt) { dt.ontoggle = function () { state.ui['open:' + dt.dataset.fold] = dt.open; save_('myra-ui', state.ui); }; });
+    var af = $('addform');
+    if (af) af.onsubmit = function (e) {
+      e.preventDefault();
+      var raw = $('addc').value.trim().toUpperCase().replace(/\s+/g, '');
+      var m = raw.match(/^(\d{2})-([A-Z])-(\d{1,4})$/), c = m ? m[1] + '-' + m[2] + '-' + ('0000' + m[3]).slice(-4) : (/^\d{2}-\d{5}$/.test(raw) ? raw : '');
+      if (!c) { state.msg.add = 'Enter a case number like 26-G-0384 or a matter number like 26-01149.'; render(); return; }
+      var k = docket(c);
+      if (k && k.tr) { state.msg.add = c + ' is already tracked.'; render(); return; }
+      state.msg.add = '';
+      send('add:' + c, { op: 'add_docket', c: c, via: 'dashboard' }, af.querySelector('button'));
+    };
+    var ef = $('entform');
+    if (ef) ef.onsubmit = function (e) {
+      e.preventDefault();
+      var name = $('entname').value.trim(); if (!name) return;
+      var match = $('entmatch').value.split(',').map(function (x) { return x.trim(); }).filter(String);
+      send('entadd:' + name, { op: 'entity_add', name: name, match: match.length ? match : [name] }, ef.querySelector('button'));
+    };
+    var mine = $('mine'); if (mine) mine.onclick = function () { state.mineOnly = !state.mineOnly; render(); };
+    var rt = $('routine'); if (rt) rt.onclick = function () { state.showRoutine = !state.showRoutine; render(); };
+    var run = $('run'); if (run) run.onclick = function () { runCheck(run); };
+  }
+  $('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-tab]'); if (!b) return;
+    state.tab = b.dataset.tab; state.ui.tab = state.tab; save_('myra-ui', state.ui);
+    try { history.replaceState(null, '', '#' + state.tab); } catch (x) {}
+    render();
+  });
+  window.addEventListener('hashchange', function () { var t = location.hash.slice(1); if (/^(today|session|dockets|cases|prefs)$/.test(t)) { state.tab = t; render(); } });
+  render();
+  if (window.claude && window.claude.use) load(); else setStatus('bad', 'Open MyRA on claude.ai to load your data.');
+})();
+</script>
+</body>
+</html>
