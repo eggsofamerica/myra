@@ -23,18 +23,30 @@ Data flow: collector → event queue → Claude check → inbox ops → collecto
 
 Useful background: `README.md`, `docs/dmm-access.md` (the DMM JSON requests), and the top of each code file.
 
-## 2. Check what the person and this session have
+## 2. Connect Google Drive first
 
-Before starting, confirm each item and tell the person plainly about anything missing.
+MyRA cannot be built without the Google Drive connector, and the person may never have connected one. Handle this before anything else.
+
+1. **Check this session.** Look for Google Drive tools (`create_file`, `search_files`, `read_file_content`, `download_file_content`, `trash_file`; their full names usually start with `mcp__Google_Drive__`). If tools are deferred, search for them with your tool search ("google drive create file") before concluding they are missing.
+2. **If they are missing,** find out why:
+   - Not connected at all: if you have a connector registry search (such as `SearchMcpRegistry` and `SuggestConnectors`), search for "Google Drive" and show the person the connect option. Otherwise tell them: "MyRA keeps its files in your Google Drive, so I need the Google Drive connector. In claude.ai, open Settings, go to Connectors, find Google Drive and connect it. Sign in with the Google account you want MyRA to use and allow the access Google asks for. Then come back to this chat and tell me it's done." Exact labels can differ by app version, so describe the place and don't promise the precise wording.
+   - Connected but off in this chat: ask them to turn Google Drive on in this chat's connector or tools menu, then continue.
+   - Ask which Google account to use. A personal account works well. A work account may have admin restrictions that block Apps Script or sharing.
+3. **Prove it works.** Create a small test file in their Drive (a text file `myra-connection-test.txt` with `disableConversionToGoogleType: true`), read it back, then trash it. If any step fails, fix the connection before going on. Don't start the build on a half-working connector.
+4. **Tell them why it matters later.** The scheduled check and the dashboard both reach Google Drive through this same connection. If it ever lapses, MyRA stops updating until they reconnect it in the same place.
+
+## 3. Check what else the person and this session have
+
+Confirm each item and tell the person plainly about anything missing.
 
 - **A Claude plan with scheduled tasks** and the scheduling tools in this session (`create_trigger`, `update_trigger`, `fire_trigger`, `list_triggers`; search for them with your tool search if they are deferred).
-- **The Google Drive connector**, connected to the Google account that will own MyRA (needs `create_file`, `search_files`, `read_file_content`, `download_file_content`, `trash_file`). A personal Google account works well.
+- **The scheduling connector for the dashboard.** The dashboard's "Run the check now" button calls `fire_trigger` through the viewer's own connectors. In the original build that connector's display name was "Claude Code Remote". If the person's account shows it under another name, use that name in Step 7. If they don't have it at all, the button won't work, but everything else will, and the check still runs on schedule.
 - **An artifact tool** that can publish a page and declare capabilities (`publish_files` or `publish_version`, and `declare_capabilities`).
 - **A shell in this session** with Node and Python (for tests and for preparing files), and access to GitHub to clone the repo.
 - **Network access to the PSC sites.** Run `curl -s -o /dev/null -w "%{http_code}\n" "https://documents.dps.ny.gov/public/MatterManagement/CaseMaster.aspx?MatterCaseNo=22-M-0149"`. If it is not 200, the person must add `documents.dps.ny.gov` and `dps.ny.gov` to the allowed domains for Claude's code execution (on claude.ai in a web browser, under Settings, in the capabilities or code-execution network settings; let them find the exact control, and do not guess a menu path). This also lets the scheduled check download filings, so it is required, not optional. Retest afterwards.
 - **A computer for one step** (pasting a script into Google Apps Script; the phone editor is impractical).
 
-## 3. Interview the person first
+## 4. Interview the person first
 
 Ask these in one or two short rounds (use your multiple-choice question tool if you have one). Write the answers into a private notes file in your working directory, never into a public repo.
 
@@ -46,7 +58,7 @@ Ask these in one or two short rounds (use your multiple-choice question tool if 
 6. **Models**: recommend Sonnet for the scheduled task (cheaper) with Opus subagents for summaries and narratives (already written into the instructions). Only set or change a task's model when the person asks for it in their own words.
 7. **Do they want their own GitHub fork?** Not required. If yes, it must stay free of their Drive IDs, names and other identifying details; keep all real IDs only in private copies.
 
-## 4. Build it
+## 5. Build it
 
 ### Step 1. Get the code and prove the environment works
 
@@ -111,7 +123,7 @@ Give them these steps, with the filled-in bootstrap in a code block:
 1. Copy `claude-check/prompt.md` privately and personalize it:
    - Replace `YOUR_EVENTS_FILE_ID`, `YOUR_INBOX_FOLDER_ID`, `YOUR_NARRATIVES_FOLDER_ID`, `YOUR_DIGESTS_FOLDER_ID`, `YOUR_TOOLS_FILE_ID`.
    - Replace the reader line ("The reader is an expert in New York energy policy ...") with what they told you in the interview, and optionally "the user" with their first name.
-2. Create the scheduled task with `create_trigger`: the full personalized text as the prompt, a weekday cron in their time zone after the collector (default `CRON_TZ=America/New_York 49 6 * * 1-5`), push notifications on. Tell them in one sentence what approval setting it got.
+2. Create the scheduled task with `create_trigger`: the full personalized text as the prompt, a weekday cron in their time zone after the collector (default `CRON_TZ=America/New_York 49 6 * * 1-5`), push notifications on. Tell them in one sentence what approval setting it got. Then check the new task's connections (in the `create_trigger` result or `list_triggers`): Google Drive must be among them, or the check cannot read its queue. If it is missing, make sure Google Drive is connected and on in this chat, then update or recreate the task.
 3. **Expect a possible permission block.** An automatic safety check may refuse to create a task that sends push notifications or acts unattended. Do not work around it. Explain what you were creating and ask the person to say explicitly that you should go ahead, then retry once. If it is still refused, give them the prompt text to paste into a new scheduled task themselves in the Claude app.
 4. Run it once now with `fire_trigger`. After about 5 to 10 minutes, verify: a narrative Google Doc per starting docket in `Docket narratives`, a digest in `Digests`, and a new `inbox: applied <n> op(s)` line in `myra_log.txt`. Read one narrative and judge its quality before moving on.
 
@@ -137,7 +149,7 @@ Tell the person, briefly:
 - **Timing:** requests reach the collector within 5 minutes. The check waits for requests still in the inbox before it starts.
 - **The Sheet** mirrors everything for browsing.
 
-## 5. Lessons from the original build
+## 6. Lessons from the original build
 
 - **DMM blocks one user agent.** A bare `Mozilla/5.0` header gets an empty reply. curl's default and Google Apps Script's own header both work. Don't set a fake browser header.
 - **DMM's case pages load their tables by script.** Use the JSON requests in `docs/dmm-access.md`; no browser is needed.
@@ -149,7 +161,7 @@ Tell the person, briefly:
 - **Agenda timing:** the preliminary agenda posts about a week before a session and the final one the day before. Transcripts take several weeks. DPS press releases are filed into the dockets themselves, so tracking a docket catches them.
 - **Public comments** are counted, not summarized, unless the person asks for one or a priority entity filed it.
 
-## 6. Placeholder reference
+## 7. Placeholder reference
 
 | Placeholder | File(s) | Value |
 | --- | --- | --- |
