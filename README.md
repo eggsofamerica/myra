@@ -1,5 +1,7 @@
 # MyRA
 
+**Want your own?** Give [docs/BUILD_YOUR_OWN_MYRA.md](docs/BUILD_YOUR_OWN_MYRA.md) to Claude and ask it to help you set up MyRA. It walks Claude through building your own copy on your own Google Drive and Claude accounts.
+
 A personal tracker for New York Public Service Commission activity: session agendas and transcripts, filings in tracked dockets, and new proceedings.
 
 ## How it fits together
